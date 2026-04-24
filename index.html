@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔兽世界工会团本活动管理</title>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --bg-dark:#0a0a1a;--bg-panel:#12122a;--bg-card:#1a1a3e;--bg-input:#0e0e24;
+            --gold:#f0c040;--gold-dim:#a08030;--gold-glow:rgba(240,192,64,0.15);
+            --text:#d8d8e8;--text-dim:#8888a8;
+            --border:rgba(240,192,64,0.2);--border-light:rgba(240,192,64,0.4);
+            --danger:#e04050;--success:#40c070;
+            --header-h:56px;
+        }
+        body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg-dark);color:var(--text);min-height:100vh}
+        .app-header{background:linear-gradient(135deg,#12122a,#1a0a2a);border-bottom:2px solid var(--gold-dim);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,.5);flex-wrap:wrap;gap:8px;min-height:var(--header-h)}
+        .app-header h1{font-size:20px;color:var(--gold);text-shadow:0 0 20px rgba(240,192,64,.3);letter-spacing:2px;white-space:nowrap}
+        .app-header h1 span{font-size:12px;color:var(--text-dim);margin-left:8px;letter-spacing:0}
+        .header-actions{display:flex;gap:8px;flex-wrap:wrap}
+        .btn{padding:8px 14px;border:1px solid var(--border-light);border-radius:6px;background:linear-gradient(135deg,#2a2a4e,#1a1a3e);color:var(--gold);font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap}
+        .btn:hover{background:linear-gradient(135deg,#3a3a5e,#2a2a4e);box-shadow:0 0 12px var(--gold-glow)}
+        .btn-primary{background:linear-gradient(135deg,#3a2a10,#2a1a08);border-color:var(--gold)}
+        .btn-danger{border-color:var(--danger);color:var(--danger)}
+        .btn-danger:hover{background:rgba(224,64,80,.15)}
+        .btn-sm{padding:5px 10px;font-size:12px}
+        .btn-xs{padding:3px 8px;font-size:11px;border-radius:4px}
+        input,select{padding:7px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+        input:focus,select:focus{border-color:var(--gold)}
+        select option{background:#1a1a3e;color:var(--text)}
+
+        .app-layout{display:flex;align-items:flex-start;min-height:calc(100vh - var(--header-h))}
+
+        .roster-panel{
+            width:290px;min-width:290px;
+            background:var(--bg-panel);
+            border-right:1px solid var(--border);
+            position:sticky;
+            top:var(--header-h);
+            height:calc(100vh - var(--header-h));
+            display:flex;flex-direction:column;
+            overflow:hidden;
+            flex-shrink:0;
+            z-index:50;
+        }
+        .roster-header{padding:14px;border-bottom:1px solid var(--border)}
+        .roster-header h2{font-size:15px;color:var(--gold);margin-bottom:10px}
+        .add-member-form{display:flex;flex-direction:column;gap:8px}
+        .form-row{display:flex;gap:6px}
+        .form-row>*{flex:1;min-width:0}
+        .roster-list{flex:1;overflow-y:auto;padding:10px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px}
+        .roster-list::-webkit-scrollbar{width:5px}
+        .roster-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        .roster-count{padding:8px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--text-dim)}
+
+        .member-card{display:flex;align-items:center;padding:6px 10px;border-radius:6px;cursor:grab;transition:all .15s;border:1px solid rgba(255,255,255,.08);gap:6px;user-select:none;flex-shrink:0}
+        .member-card:hover{border-color:rgba(255,255,255,.25);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+        .member-card:active{cursor:grabbing;opacity:.8}
+        .member-card.dragging{opacity:.4}
+        .card-icon{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15)}
+        .card-info{flex:1;min-width:0}
+        .card-name{font-size:12px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .card-spec{font-size:10px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .card-delete{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);color:#ff6b6b;font-size:13px;cursor:pointer;opacity:0;transition:opacity .15s;flex-shrink:0;border:none;line-height:1}
+        .member-card:hover .card-delete{opacity:1}
+        .card-delete:hover{background:rgba(224,64,80,.4)!important}
+
+        .mini-card{display:inline-flex;align-items:center;padding:3px 8px;border-radius:4px;font-size:12px;gap:4px;cursor:grab;user-select:none;border:1px solid transparent;transition:all .15s;margin:2px}
+        .mini-card:hover{border-color:rgba(255,255,255,.25)}
+        .mini-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:bold;font-size:11px}
+        .mini-remove{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);color:#ff6b6b;font-size:11px;cursor:pointer;opacity:0;transition:opacity .15s;flex-shrink:0;border:none;line-height:1}
+        .mini-card:hover .mini-remove{opacity:1}
+
+        .activity-panel{
+            flex:1;
+            padding:16px;
+            display:flex;flex-direction:column;
+            gap:14px;
+            min-width:0;
+        }
+
+        .week-block{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+        .week-header{display:flex;align-items:center;padding:12px 16px;background:linear-gradient(135deg,rgba(240,192,64,.06),transparent);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;gap:10px;flex-wrap:wrap}
+        .week-header:hover{background:linear-gradient(135deg,rgba(240,192,64,.12),transparent)}
+        .week-toggle{font-size:12px;color:var(--gold);transition:transform .3s}
+        .week-toggle.collapsed{transform:rotate(-90deg)}
+        .week-title{flex:1;min-width:150px}
+        .week-title input{background:transparent;border:none;color:var(--gold);font-size:14px;font-weight:bold;width:100%;max-width:280px;padding:2px 4px;border-bottom:1px dashed var(--border)}
+        .week-title input:focus{border-bottom-color:var(--gold)}
+        .week-stats{font-size:11px;color:var(--text-dim);white-space:nowrap;padding:2px 8px;background:rgba(0,0,0,.3);border-radius:10px}
+        .week-actions{display:flex;gap:6px;flex-wrap:wrap}
+        .week-body{padding:14px;display:flex;flex-direction:column;gap:14px}
+        .week-body.collapsed{display:none}
+
+        .boss-block{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+        .boss-header{display:flex;align-items:center;padding:10px 14px;gap:10px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+        .boss-header input{background:transparent;border:none;color:var(--text);font-size:14px;font-weight:bold;flex:1;min-width:100px;padding:2px 4px;border-bottom:1px dashed var(--border)}
+        .boss-header input:focus{border-bottom-color:var(--gold)}
+        .boss-number{font-size:11px;color:var(--text-dim);background:rgba(240,192,64,.1);border:1px solid var(--border);padding:2px 8px;border-radius:10px;white-space:nowrap}
+        .boss-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+        .role-col{border-right:1px solid var(--border);min-height:80px;display:flex;flex-direction:column}
+        .role-col:last-child{border-right:none}
+        .role-col-header{padding:6px 10px;font-size:11px;font-weight:bold;text-align:center;border-bottom:1px solid var(--border);letter-spacing:1px}
+        .role-col-header.tank{background:rgba(80,130,255,.12);color:#5082ff}
+        .role-col-header.healer{background:rgba(80,220,120,.12);color:#50dc78}
+        .role-col-header.melee{background:rgba(255,100,80,.12);color:#ff6450}
+        .role-col-header.ranged{background:rgba(200,130,255,.12);color:#c882ff}
+        .role-col-body{flex:1;padding:6px;min-height:50px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:2px;transition:background .2s}
+        .role-col-body.drag-over{background:rgba(240,192,64,.1);outline:2px dashed var(--gold)}
+
+        .back-to-top{
+            position:fixed;bottom:20px;right:20px;z-index:150;
+            width:44px;height:44px;border-radius:50%;
+            background:linear-gradient(135deg,#3a2a10,#2a1a08);
+            border:2px solid var(--gold);color:var(--gold);
+            font-size:20px;cursor:pointer;
+            box-shadow:0 4px 16px rgba(0,0,0,.5);
+            display:none;align-items:center;justify-content:center;
+            transition:opacity .3s,transform .3s;
+        }
+        .back-to-top.show{display:flex}
+        .back-to-top:hover{transform:scale(1.1)}
+
+        .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;font-size:14px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;background:#2a4a2a;color:#50dc78;border:1px solid #50dc78}
+        .toast.show{opacity:1}
+        .toast.error{background:#4a2a2a;color:#ff6b6b;border-color:#ff6b6b}
+
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center}
+        .modal-box{background:var(--bg-panel);border:1px solid var(--gold-dim);border-radius:12px;padding:24px;max-width:380px;width:90%;text-align:center}
+        .modal-box p{margin-bottom:20px;font-size:14px;line-height:1.6}
+        .modal-btns{display:flex;gap:12px;justify-content:center}
+
+        .export-select{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;max-height:200px;overflow-y:auto;text-align:left}
+        .export-select label{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;border:1px solid var(--border);transition:background .2s}
+        .export-select label:hover{background:rgba(240,192,64,.08)}
+        .export-select input[type="radio"]{accent-color:var(--gold)}
+
+        .snapshot-week{background:#12122a;padding:20px;border-radius:12px;border:1px solid rgba(240,192,64,.3);min-width:800px}
+        .snapshot-title{font-size:20px;color:#f0c040;text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid rgba(240,192,64,.3)}
+        .snapshot-boss{background:#1a1a3e;border:1px solid rgba(240,192,64,.2);border-radius:8px;margin-bottom:14px;overflow:hidden}
+        .snapshot-boss-name{padding:10px 14px;font-size:15px;font-weight:bold;color:#f0c040;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(240,192,64,.2)}
+        .snapshot-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+        .snapshot-col{border-right:1px solid rgba(240,192,64,.15);padding:8px}
+        .snapshot-col:last-child{border-right:none}
+        .snapshot-col-title{font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.1)}
+        .snapshot-member{padding:3px 8px;border-radius:4px;margin:3px 0;font-size:12px;font-weight:bold;text-align:center}
+        .snapshot-footer{text-align:center;margin-top:12px;font-size:11px;color:#8888a8}
+
+        .mobile-roster-toggle{
+            display:none;position:fixed;bottom:72px;right:20px;z-index:150;
+            width:44px;height:44px;border-radius:50%;
+            background:linear-gradient(135deg,#2a2a4e,#1a1a3e);
+            border:2px solid var(--gold);color:var(--gold);
+            font-size:20px;cursor:pointer;
+            box-shadow:0 4px 16px rgba(0,0,0,.5);
+            align-items:center;justify-content:center;
+        }
+
+        @media(max-width:768px){
+            .app-header{min-height:auto;padding:10px 12px}
+            .app-header h1{font-size:16px}
+            .app-layout{flex-direction:column}
+            .roster-panel{
+                width:100%;min-width:unset;
+                position:relative;top:0;
+                height:auto;max-height:50vh;
+                border-right:none;border-bottom:1px solid var(--border);
+            }
+            .roster-panel.mobile-hidden{display:none}
+            .activity-panel{min-height:60vh}
+            .boss-grid{grid-template-columns:repeat(2,1fr)}
+            .role-col:nth-child(2){border-right:none}
+            .role-col:nth-child(3){border-top:1px solid var(--border)}
+            .role-col:nth-child(4){border-top:1px solid var(--border)}
+            .mobile-roster-toggle{display:flex!important}
+            .week-actions{width:100%;justify-content:flex-start}
+            .back-to-top{bottom:20px;right:72px}
+        }
+        @media(max-width:480px){
+            .boss-grid{grid-template-columns:1fr 1fr}
+            .header-actions{width:100%;justify-content:space-between}
+            .header-actions .btn{flex:1;text-align:center;padding:6px 4px;font-size:11px}
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-header">
+    <h1>⚔️ 团本管理器 <span>Guild Raid Manager</span></h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="addWeek()">📅 添加周活动</button>
+        <button class="btn" onclick="showExportDialog()">📸 导出图片</button>
+        <button class="btn" onclick="saveData()">💾 保存数据</button>
+        <button class="btn btn-danger" onclick="confirmClearAll()">🗑️ 清空数据</button>
+    </div>
+</div>
+
+<div class="app-layout">
+    <div class="roster-panel" id="rosterPanel">
+        <div class="roster-header">
+            <h2>⚔️ 团队成员</h2>
+            <div class="add-member-form">
+                <input type="text" id="memberName" placeholder="输入昵称..." maxlength="12">
+                <div class="form-row">
+                    <select id="memberClass" onchange="updateSpecOptions()">
+                        <option value="">选择职业</option>
+                    </select>
+                    <select id="memberSpec">
+                        <option value="">选择专精</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="addMember()" style="width:100%">➕ 添加成员</button>
+            </div>
+        </div>
+        <div class="roster-list" id="rosterList"></div>
+        <div class="roster-count" id="rosterCount">共 0 名成员</div>
+    </div>
+    <div class="activity-panel" id="activityPanel"></div>
+</div>
+
+<button class="mobile-roster-toggle" id="mobileToggle" onclick="toggleMobileRoster()">👥</button>
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">⬆</button>
+<div class="toast" id="toast"></div>
+
+<script>
+const CLASS_DATA = {
+    '战士':   {color:'#C79C6E',icon:'🗡️',specs:['武器','狂怒','防护'],roles:{武器:'melee',狂怒:'melee',防护:'tank'}},
+    '圣骑士': {color:'#F58CBA',icon:'🛡️',specs:['神圣','防护','惩戒'],roles:{神圣:'healer',防护:'tank',惩戒:'melee'}},
+    '猎人':   {color:'#ABD473',icon:'🏹',specs:['兽王','射击','生存'],roles:{兽王:'ranged',射击:'ranged',生存:'melee'}},
+    '盗贼':   {color:'#FFF569',icon:'🗡️',specs:['刺杀','狂徒','敏锐'],roles:{刺杀:'melee',狂徒:'melee',敏锐:'melee'}},
+    '牧师':   {color:'#FFFFFF',icon:'✝️',specs:['戒律','神圣','暗影'],roles:{戒律:'healer',神圣:'healer',暗影:'ranged'}},
+    '萨满':   {color:'#0070DE',icon:'🔷',specs:['元素','增强','恢复'],roles:{元素:'ranged',增强:'melee',恢复:'healer'}},
+    '法师':   {color:'#69CCF0',icon:'❄️',specs:['奥术','火焰','冰霜'],roles:{奥术:'ranged',火焰:'ranged',冰霜:'ranged'}},
+    '术士':   {color:'#9482C9',icon:'🔮',specs:['痛苦','恶魔','毁灭'],roles:{痛苦:'ranged',恶魔:'ranged',毁灭:'ranged'}},
+    '武僧':   {color:'#00FF96',icon:'🥋',specs:['酒仙','织雾','踏风'],roles:{酒仙:'tank',织雾:'healer',踏风:'melee'}},
+    '德鲁伊': {color:'#FF7D0A',icon:'🐻',specs:['平衡','野性','守护','恢复'],roles:{平衡:'ranged',野性:'melee',守护:'tank',恢复:'healer'}},
+    '恶魔猎手':{color:'#A330C9',icon:'👿',specs:['浩劫','复仇','噬灭'],roles:{浩劫:'melee',复仇:'tank',噬灭:'ranged'}},
+    '死亡骑士':{color:'#C41F3B',icon:'💀',specs:['鲜血','冰霜','邪恶'],roles:{鲜血:'tank',冰霜:'melee',邪恶:'melee'}},
+    '唤魔师': {color:'#33937F',icon:'🐲',specs:['湮灭','保存','增辉'],roles:{湮灭:'ranged',保存:'healer',增辉:'ranged'}}
+};
+
+let members = [];
+let weeks = [];
+let dragData = null;
+let idCounter = 1;
+let weekIdCounter = 1;
+let bossIdCounter = 1;
+
+function init() {
+    populateClassSelect();
+    loadData();
+    renderRoster();
+    renderWeeks();
+    setupScrollListener();
+}
+
+function populateClassSelect() {
+    const sel = document.getElementById('memberClass');
+    sel.innerHTML = '<option value="">选择职业</option>';
+    for (const cls of Object.keys(CLASS_DATA)) {
+        sel.innerHTML += '<option value="' + cls + '">' + CLASS_DATA[cls].icon + ' ' + cls + '</option>';
+    }
+}
+
+function updateSpecOptions() {
+    const cls = document.getElementById('memberClass').value;
+    const sel = document.getElementById('memberSpec');
+    sel.innerHTML = '<option value="">选择专精</option>';
+    if (cls && CLASS_DATA[cls]) {
+        CLASS_DATA[cls].specs.forEach(function(s) {
+            sel.innerHTML += '<option value="' + s + '">' + s + '</option>';
+        });
+    }
+}
+
+function setupScrollListener() {
+    var btn = document.getElementById('backToTop');
+    window.addEventListener('scroll', function() {
+        if (window.scrollY > 400) { btn.classList.add('show'); }
+        else { btn.classList.remove('show'); }
+    }, { passive: true });
+}
+
+function addMember() {
+    var name = document.getElementById('memberName').value.trim();
+    var cls = document.getElementById('memberClass').value;
+    var spec = document.getElementById('memberSpec').value;
+    if (!name) return showToast('请输入昵称', true);
+    if (!cls) return showToast('请选择职业', true);
+    if (!spec) return showToast('请选择专精', true);
+    var role = CLASS_DATA[cls].roles[spec];
+    members.push({ id: idCounter++, name: name, 'class': cls, spec: spec, role: role });
+    document.getElementById('memberName').value = '';
+    document.getElementById('memberClass').value = '';
+    updateSpecOptions();
+    renderRoster();
+    saveData();
+    showToast('已添加 ' + name);
+}
+
+function deleteMember(id) {
+    var m = members.find(function(x) { return x.id === id; });
+    if (!m) return;
+    members = members.filter(function(x) { return x.id !== id; });
+    weeks.forEach(function(w) {
+        w.bosses.forEach(function(b) {
+            ['tank','healer','melee','ranged'].forEach(function(r) {
+                b[r] = b[r].filter(function(mid) { return mid !== id; });
+            });
+        });
+    });
+    renderRoster();
+    renderWeeks();
+    saveData();
+    showToast('已删除 ' + m.name);
+}
+
+function renderRoster() {
+    var list = document.getElementById('rosterList');
+    list.innerHTML = '';
+    members.forEach(function(m) {
+        var cd = CLASS_DATA[m['class']];
+        var div = document.createElement('div');
+        div.className = 'member-card';
+        div.style.background = hexToRGBA(cd.color, 0.15);
+        div.style.color = cd.color;
+        div.draggable = true;
+        div.dataset.memberId = m.id;
+        div.innerHTML =
+            '<div class="card-icon">' + cd.icon + '</div>' +
+            '<div class="card-info">' +
+                '<div class="card-name">' + m.name + '</div>' +
+                '<div class="card-spec">' + m['class'] + ' - ' + m.spec + '</div>' +
+            '</div>' +
+            '<button class="card-delete" title="删除">×</button>';
+        (function(member) {
+            div.querySelector('.card-delete').addEventListener('click', function(e) {
+                e.stopPropagation(); e.preventDefault();
+                deleteMember(member.id);
+            });
+            div.addEventListener('dragstart', function(e) {
+                dragData = { memberId: member.id, sourceType: 'roster' };
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(member.id));
+                div.classList.add('dragging');
+            });
+            div.addEventListener('dragend', function() {
+                div.classList.remove('dragging');
+                dragData = null;
+            });
+            div.addEventListener('touchstart', function() {
+                dragData = { memberId: member.id, sourceType: 'roster' };
+            }, {passive:true});
+        })(m);
+        list.appendChild(div);
+    });
+    document.getElementById('rosterCount').textContent = '共 ' + members.length + ' 名成员';
+}
+
+function addWeek() {
+    var now = new Date();
+    var monday = new Date(now);
+    monday.setDate(now.getDate() - (now.getDay() || 7) + 1 + (weeks.length * 7));
+    var sun = new Date(monday);
+    sun.setDate(monday.getDate() + 6);
+    var fmt = function(d) { return (d.getMonth()+1) + '.' + d.getDate(); };
+    var title = '第' + (weeks.length+1) + '周 (' + fmt(monday) + ' - ' + fmt(sun) + ')';
+    weeks.push({ id: weekIdCounter++, title: title, collapsed: false, bosses: [] });
+    renderWeeks();
+    saveData();
+    showToast('已添加周活动');
+    setTimeout(function() {
+        var panel = document.getElementById('activityPanel');
+        var last = panel.lastElementChild;
+        if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+}
+
+function deleteWeek(weekId) {
+    showConfirm('确定删除这个周活动吗？', function() {
+        weeks = weeks.filter(function(w) { return w.id !== weekId; });
+        renderWeeks();
+        saveData();
+        showToast('已删除周活动');
+    });
+}
+
+function copyPreviousWeek(weekId) {
+    var idx = weeks.findIndex(function(w) { return w.id === weekId; });
+    if (idx <= 0) return showToast('没有上周活动可复制', true);
+    var prev = weeks[idx - 1];
+    var curr = weeks[idx];
+    curr.bosses = prev.bosses.map(function(b) {
+        return {
+            id: bossIdCounter++,
+            name: b.name,
+            tank: b.tank.slice(),
+            healer: b.healer.slice(),
+            melee: b.melee.slice(),
+            ranged: b.ranged.slice()
+        };
+    });
+    renderWeeks();
+    saveData();
+    showToast('已复制上周活动安排');
+}
+
+function toggleWeek(weekId) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (w) { w.collapsed = !w.collapsed; renderWeeks(); saveData(); }
+}
+
+function updateWeekTitle(weekId, val) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (w) {w.title = val; saveData(); }
+}
+
+function addBoss(weekId) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (!w) return;
+    w.bosses.push({ id: bossIdCounter++, name: '新Boss', tank: [], healer: [], melee: [], ranged: [] });
+    if (w.collapsed) { w.collapsed = false; }
+    renderWeeks();
+    saveData();
+    showToast('已添加Boss');
+}
+
+function deleteBoss(weekId, bossId) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (!w) return;
+    showConfirm('确定删除这个Boss吗？', function() {
+        w.bosses = w.bosses.filter(function(b) { return b.id !== bossId; });
+        renderWeeks();
+        saveData();
+        showToast('已删除Boss');
+    });
+}
+
+function updateBossName(weekId, bossId, val) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (!w) return;
+    var b = w.bosses.find(function(x) { return x.id === bossId; });
+    if (b) { b.name = val; saveData(); }
+}
+
+function removeFromBoss(weekId, bossId, role, memberId) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (!w) return;
+    var b = w.bosses.find(function(x) { return x.id === bossId; });
+    if (!b) return;
+    b[role] = b[role].filter(function(id) { return id !== memberId; });
+    renderWeeks();
+    saveData();
+}
+
+function getWeekMemberCount(w) {
+    var ids = {};
+    w.bosses.forEach(function(b) {
+        ['tank','healer','melee','ranged'].forEach(function(r) {
+            b[r].forEach(function(id) { ids[id] = true; });
+        });
+    });
+    return Object.keys(ids).length;
+}
+
+function renderWeeks() {
+    var panel = document.getElementById('activityPanel');
+    panel.innerHTML = '';
+    if (weeks.length === 0) {
+        panel.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-dim)"><p style="font-size:40px;margin-bottom:16px">📅</p><p style="font-size:16px">还没有周活动</p><p style="font-size:13px;margin-top:8px">点击上方"添加周活动"开始安排</p></div>';
+        return;
+    }
+    weeks.forEach(function(w) {
+        var memberCount = getWeekMemberCount(w);
+        var block = document.createElement('div');
+        block.className = 'week-block';
+        block.innerHTML =
+            '<div class="week-header" onclick="toggleWeek(' + w.id + ')">' +
+                '<span class="week-toggle ' + (w.collapsed?'collapsed':'') + '">▼</span>' +
+                '<div class="week-title"><input type="text" value="' + escHTML(w.title) + '" onclick="event.stopPropagation()" oninput="updateWeekTitle(' + w.id + ',this.value)"></div>' +
+                '<span class="week-stats">' + w.bosses.length + ' Boss · ' + memberCount + ' 人</span>' +
+                '<div class="week-actions">' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();addBoss(' + w.id + ')">➕ Boss</button>' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();copyPreviousWeek(' + w.id + ')">📋 复制上周</button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteWeek(' + w.id + ')">🗑️ 删除</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="week-body ' + (w.collapsed?'collapsed':'') + '" id="weekBody_' + w.id + '"></div>';
+        panel.appendChild(block);
+        var body = block.querySelector('#weekBody_' + w.id);
+        if (w.bosses.length === 0 && !w.collapsed) {
+            body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px">暂无Boss，点击"➕ Boss"添加</div>';
+        }
+        w.bosses.forEach(function(b, bi) {
+            var bossEl = document.createElement('div');
+            bossEl.className = 'boss-block';
+            var totalInBoss = b.tank.length + b.healer.length + b.melee.length + b.ranged.length;
+            bossEl.innerHTML =
+                '<div class="boss-header">' +
+                    '<span style="font-size:18px">💀</span>' +
+                    '<span class="boss-number">#' + (bi+1) + ' · ' + totalInBoss + '人</span>' +
+                    '<input type="text" value="' + escHTML(b.name) + '" oninput="updateBossName(' + w.id + ',' + b.id + ',this.value)">' +
+                    '<button class="btn btn-xs btn-danger" onclick="deleteBoss(' + w.id + ',' + b.id + ')">删除</button>' +
+                '</div>' +
+                '<div class="boss-grid">' +
+                    buildRoleCol(w.id, b.id, 'tank', '🛡️ 坦克', b.tank) +
+                    buildRoleCol(w.id, b.id, 'healer', '💚 治疗', b.healer) +
+                    buildRoleCol(w.id, b.id, 'melee', '⚔️ 近战', b.melee) +
+                    buildRoleCol(w.id, b.id, 'ranged', '🎯 远程', b.ranged) +
+                '</div>';
+            body.appendChild(bossEl);
+            bossEl.querySelectorAll('.role-col-body').forEach(function(zone) {
+                var role = zone.dataset.role;
+                var wid = parseInt(zone.dataset.weekId);
+                var bid = parseInt(zone.dataset.bossId);
+                zone.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect='move'; zone.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
+                zone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if (!dragData) return;
+                    handleDrop(wid, bid, role, dragData.memberId, dragData.sourceType, dragData.sourceWeekId, dragData.sourceBossId, dragData.sourceRole);
+                    dragData = null;
+                });
+                zone.addEventListener('touchend', function(e) {
+                    if (!dragData) return;
+                    var touch = e.changedTouches[0];
+                    var el = document.elementFromPoint(touch.clientX, touch.clientY);
+                    var dropZone = el && el.closest('.role-col-body');
+                    if (dropZone && dropZone === zone) {
+                        handleDrop(wid, bid, role, dragData.memberId, dragData.sourceType, dragData.sourceWeekId, dragData.sourceBossId, dragData.sourceRole);
+                    }
+                    dragData = null;
+                }, {passive:true});
+            });
+        });
+    });
+}
+
+function buildRoleCol(weekId, bossId, role, label, memberIds) {
+    var roleClass = role;
+    var cardsHTML = '';
+    memberIds.forEach(function(mid) {
+        var m = members.find(function(x) { return x.id === mid; });
+        if (!m) return;
+        var cd = CLASS_DATA[m['class']];
+        cardsHTML +=
+            '<div class="mini-card" style="background:' + hexToRGBA(cd.color,0.2) + ';color:' + cd.color + '" draggable="true"' +
+            ' data-member-id="' + m.id + '" data-source-week="' + weekId + '" data-source-boss="' + bossId + '" data-source-role="' + role + '">' +
+                '<span class="mini-name">' + cd.icon + ' ' + m.name + '</span>' +
+                '<button class="mini-remove" onclick="event.stopPropagation();removeFromBoss(' + weekId + ',' + bossId + ',\'' + role + '\',' + m.id + ')">×</button>' +
+            '</div>';
+    });
+    return '<div class="role-col">' +
+        '<div class="role-col-header ' + roleClass + '">' + label + ' (' + memberIds.length + ')</div>' +
+        '<div class="role-col-body" data-role="' + role + '" data-week-id="' + weekId + '" data-boss-id="' + bossId + '">' +
+            cardsHTML +
+        '</div></div>';
+}
+
+function handleDrop(weekId, bossId, role, memberId, sourceType, srcWeekId, srcBossId, srcRole) {
+    var w = weeks.find(function(x) { return x.id === weekId; });
+    if (!w) return;
+    var b = w.bosses.find(function(x) { return x.id === bossId; });
+    if (!b) return;
+    if (b[role].indexOf(memberId) !== -1) return showToast('该成员已在此位置', true);
+    if (sourceType === 'boss' && srcWeekId && srcBossId && srcRole) {
+        var sw = weeks.find(function(x) { return x.id === srcWeekId; });
+        if (sw) {
+            var sb = sw.bosses.find(function(x) { return x.id === srcBossId; });
+            if (sb) sb[srcRole] = sb[srcRole].filter(function(id) { return id !== memberId; });
+        }
+    }
+    b[role].push(memberId);
+    renderWeeks();
+    saveData();
+}
+
+document.addEventListener('dragstart', function(e) {
+    var mc = e.target.closest('.mini-card');
+    if (!mc) return;
+    var mid = parseInt(mc.dataset.memberId);
+    var swid = parseInt(mc.dataset.sourceWeek);
+    var sbid = parseInt(mc.dataset.sourceBoss);
+    var srole = mc.dataset.sourceRole;
+    dragData = { memberId: mid, sourceType: 'boss', sourceWeekId: swid, sourceBossId: sbid, sourceRole: srole };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(mid));
+    mc.style.opacity = '0.4';
+});
+document.addEventListener('dragend', function(e) {
+    var mc = e.target.closest('.mini-card');
+    if (mc) mc.style.opacity = '1';
+    dragData = null;
+});
+
+function showExportDialog() {
+    if (weeks.length === 0) return showToast('没有活动可导出', true);
+    if (weeks.length === 1) { exportImage(weeks[0].id); return; }
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var radios = '';
+    weeks.forEach(function(w, i) {
+        radios += '<label><input type="radio" name="exportWeek" value="' + w.id + '"' + (i===0?' checked':'') + '> ' + escHTML(w.title) + ' (' + w.bosses.length + ' Boss)</label>';
+    });
+    overlay.innerHTML =
+        '<div class="modal-box">' +
+            '<p style="font-size:15px;font-weight:bold;color:var(--gold)">选择要导出的周活动</p>' +
+            '<div class="export-select">' + radios + '</div>' +
+            '<div class="modal-btns">' +
+                '<button class="btn btn-primary" id="exportConfirm">📸 导出</button>' +
+                '<button class="btn" id="exportCancel">取消</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#exportConfirm').addEventListener('click', function() {
+        var checked = overlay.querySelector('input[name="exportWeek"]:checked');
+        if (checked) { document.body.removeChild(overlay); exportImage(parseInt(checked.value)); }
+    });
+    overlay.querySelector('#exportCancel').addEventListener('click', function() { document.body.removeChild(overlay); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) document.body.removeChild(overlay); });
+}
+
+function exportImage(weekId) {
+    var targetWeek = weeks.find(function(w) { return w.id === weekId; });
+    if (!targetWeek) return showToast('未找到该周活动', true);
+    var container = document.createElement('div');
+    container.className = 'snapshot-week';
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.zIndex = '-1';
+    var html = '<div class="snapshot-title">⚔️ ' + escHTML(targetWeek.title) + ' - 团本安排 ⚔️</div>';
+    var roles = [
+        {key:'tank',label:'🛡️ 坦克',color:'#5082ff'},
+        {key:'healer',label:'💚 治疗',color:'#50dc78'},
+        {key:'melee',label:'⚔️ 近战',color:'#ff6450'},
+        {key:'ranged',label:'🎯 远程',color:'#c882ff'}
+    ];
+    targetWeek.bosses.forEach(function(b, bi) {
+        html += '<div class="snapshot-boss">';
+        html += '<div class="snapshot-boss-name">💀 #' + (bi+1) + ' ' + escHTML(b.name) + '</div>';
+        html += '<div class="snapshot-grid">';
+        roles.forEach(function(r) {
+            html += '<div class="snapshot-col"><div class="snapshot-col-title" style="color:' + r.color + '">' + r.label + '</div>';
+            b[r.key].forEach(function(mid) {
+                var m = members.find(function(x) { return x.id === mid; });
+                if (!m) return;
+                var cd = CLASS_DATA[m['class']];
+                html += '<div class="snapshot-member" style="background:' + hexToRGBA(cd.color,.2) + ';color:' + cd.color + '">' + cd.icon + ' ' + m.name + '</div>';
+            });
+            if (b[r.key].length === 0) html += '<div style="text-align:center;font-size:11px;color:#666;padding:4px">-</div>';
+            html += '</div>';
+        });
+        html += '</div></div>';
+    });
+    html += '<div class="snapshot-footer">Generated by 团本管理器 | ' + new Date().toLocaleDateString('zh-CN') + '</div>';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    setTimeout(function() {
+        html2canvas(container, { backgroundColor: '#0a0a1a', scale: 2 }).then(function(canvas) {
+            document.body.removeChild(container);
+            var link = document.createElement('a');
+            link.download = '团本安排_' + targetWeek.title + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+            showToast('图片已导出');
+        })['catch'](function() {
+            document.body.removeChild(container);
+            showToast('导出失败', true);
+        });
+    }, 200);
+}
+
+function saveData() {
+    var data = { members: members, weeks: weeks, idCounter: idCounter, weekIdCounter: weekIdCounter, bossIdCounter: bossIdCounter };
+    localStorage.setItem('wow_raid_mgr', JSON.stringify(data));
+}
+
+function loadData() {
+    try {
+        var raw = localStorage.getItem('wow_raid_mgr');
+        if (!raw) return;
+        var data = JSON.parse(raw);
+        members = data.members || [];
+        weeks = data.weeks || [];
+        idCounter = data.idCounter || 1;
+        weekIdCounter = data.weekIdCounter || 1;
+        bossIdCounter = data.bossIdCounter || 1;
+    } catch(e) { console.error('Load error', e); }
+}
+
+function confirmClearAll() {
+    showConfirm('确定清空所有数据吗？此操作不可恢复！', function() {
+        members = [];
+        weeks = [];
+        idCounter = 1;
+        weekIdCounter = 1;
+        bossIdCounter = 1;
+        localStorage.removeItem('wow_raid_mgr');
+        renderRoster();
+        renderWeeks();
+        showToast('数据已清空');
+    });
+}
+
+function toggleMobileRoster() {
+    var panel = document.getElementById('rosterPanel');
+    panel.classList.toggle('mobile-hidden');
+    var btn = document.getElementById('mobileToggle');
+    btn.textContent = panel.classList.contains('mobile-hidden') ? '👥' : '✕';
+}
+
+function hexToRGBA(hex, alpha) {
+    hex = hex.replace('#','');
+    var r = parseInt(hex.substring(0,2),16);
+    var g = parseInt(hex.substring(2,4),16);
+    var b = parseInt(hex.substring(4,6),16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function escHTML(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, isError) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() { t.className = 'toast'; }, 2500);
+}
+
+function showConfirm(msg, onConfirm) {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+        '<div class="modal-box">' +
+            '<p>' + msg + '</p>' +
+            '<div class="modal-btns">' +
+                '<button class="btn btn-danger" id="cfmYes">确定</button>' +
+                '<button class="btn" id="cfmNo">取消</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#cfmYes').addEventListener('click', function() { document.body.removeChild(overlay); onConfirm(); });
+    overlay.querySelector('#cfmNo').addEventListener('click', function() { document.body.removeChild(overlay); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) document.body.removeChild(overlay); });
+}
+
+init();
+</script>
+</body>
+</html>
